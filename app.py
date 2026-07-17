@@ -191,7 +191,7 @@ HISTORY_FILE = "assessment_history.csv"
 # ============================================================
 # HELPER FUNCTIONS
 # ============================================================
-def save_models_to_disk(scaler, xgb_model, rf_model, svm_model, test_metrics, df_clean):
+def save_models_to_disk(scaler, xgb_model, rf_model, svm_model, test_metrics, df_clean, X_test=None, y_test=None):
     """Save trained models to disk for fast loading."""
     joblib.dump(scaler, os.path.join(MODEL_DIR, 'scaler.pkl'))
     joblib.dump(xgb_model, os.path.join(MODEL_DIR, 'xgb_model.pkl'))
@@ -199,6 +199,10 @@ def save_models_to_disk(scaler, xgb_model, rf_model, svm_model, test_metrics, df
     joblib.dump(svm_model, os.path.join(MODEL_DIR, 'svm_model.pkl'))
     joblib.dump(test_metrics, os.path.join(MODEL_DIR, 'test_metrics.pkl'))
     joblib.dump(df_clean, os.path.join(MODEL_DIR, 'df_clean.pkl'))
+    if X_test is not None:
+        joblib.dump(X_test, os.path.join(MODEL_DIR, 'X_test.pkl'))
+    if y_test is not None:
+        joblib.dump(y_test, os.path.join(MODEL_DIR, 'y_test.pkl'))
     # Save feature names for consistency
     with open(os.path.join(MODEL_DIR, 'feature_names.json'), 'w') as f:
         json.dump(FEATURE_NAMES, f)
@@ -211,14 +215,30 @@ def load_models_from_disk():
     for f in required_files:
         if not os.path.exists(os.path.join(MODEL_DIR, f)):
             return None
-    return {
+    
+    # Load feature names from JSON
+    with open(os.path.join(MODEL_DIR, 'feature_names.json'), 'r') as f:
+        feature_names = json.load(f)
+    
+    result = {
         'scaler': joblib.load(os.path.join(MODEL_DIR, 'scaler.pkl')),
         'xgb_model': joblib.load(os.path.join(MODEL_DIR, 'xgb_model.pkl')),
         'rf_model': joblib.load(os.path.join(MODEL_DIR, 'rf_model.pkl')),
         'svm_model': joblib.load(os.path.join(MODEL_DIR, 'svm_model.pkl')),
         'test_metrics': joblib.load(os.path.join(MODEL_DIR, 'test_metrics.pkl')),
-        'df_clean': joblib.load(os.path.join(MODEL_DIR, 'df_clean.pkl'))
+        'df_clean': joblib.load(os.path.join(MODEL_DIR, 'df_clean.pkl')),
+        'feature_names': feature_names
     }
+    
+    # Load X_test and y_test if they exist (saved from a previous training run)
+    x_test_path = os.path.join(MODEL_DIR, 'X_test.pkl')
+    y_test_path = os.path.join(MODEL_DIR, 'y_test.pkl')
+    if os.path.exists(x_test_path):
+        result['X_test'] = joblib.load(x_test_path)
+    if os.path.exists(y_test_path):
+        result['y_test'] = joblib.load(y_test_path)
+    
+    return result
 
 @st.cache_resource
 def load_and_train_models():
@@ -337,7 +357,7 @@ def load_and_train_models():
     }
     
     # Save to disk for future use
-    save_models_to_disk(scaler, xgb_best, rf_best, svm_best, test_metrics, df_clean)
+    save_models_to_disk(scaler, xgb_best, rf_best, svm_best, test_metrics, df_clean, X_test_scaled, y_test)
     
     return artifacts
 
